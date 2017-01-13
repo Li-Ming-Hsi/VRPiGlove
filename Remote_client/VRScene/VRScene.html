@@ -144,11 +144,11 @@
 			floor.position.set(0, 0, 0);
 			scene.add(floor);
 			
-			geometry = new THREE.BoxGeometry(2, 2, 2);
-			var handMaterial = new THREE.MeshBasicMaterial({ color:0x00ff00 });				
-			hand = new THREE.Mesh(geometry, handMaterial);
-			hand.position.set(0, 10, -5)
-			scene.add(hand);
+			//geometry = new THREE.BoxGeometry(2, 2, 2);
+			//var handMaterial = new THREE.MeshBasicMaterial({ color:0x00ff00 });				
+			//hand = new THREE.Mesh(geometry, handMaterial);
+			//hand.position.set(0, 10, -5)
+			//scene.add(hand);
 						
 			
 			// Creating a teapot
@@ -157,7 +157,7 @@
 			teapot = new THREE.Mesh(teapotGeometry, phongMaterial);
 			teapotGeometry.rotateY(-Math.PI/2);
 			teapot.position.set(0, 20, 0);
-			scene.add(teapot);
+			//scene.add(teapot);
 			teapotVertices = teapotGeometry.attributes.position.array;  // used for creating shape
 			
 			// Creating something else...
@@ -168,11 +168,11 @@
 			console.log(handPosition)
 			var raycaster = new THREE.Raycaster();
 			var hand2D = new THREE.Vector2();
-			hand2D.x = handPosition[0] / 160;
-			hand2D.y = -handPosition[1] / 120;
+			hand2D.x = -handPosition[0] / 160;
+			hand2D.y = handPosition[1] / 120;
 			raycaster.setFromCamera(hand2D, camera);
 			var hand3D = new THREE.Vector3();
-			raycaster.ray.at(5, hand3D);			
+			raycaster.ray.at(10, hand3D);			
 			//console.log(hand3D);
 			big_hand.position.set(hand3D.x, hand3D.y, hand3D.z)
 			
@@ -196,7 +196,7 @@
 				gyro_cali = true;   		
     		}
     		else {
-    			hand.rotation.set((handAngle[0] - gyro_offset[0])/ 180 * Math.PI + Math.PI/2, (handAngle[1]-gyro_offset[1])/ 180 * Math.PI, (handAngle[2]-gyro_offset[2])/ 180 * Math.PI);
+    			hand.rotation.set((handAngle[0] - gyro_offset[0])/ 180 * Math.PI + Math.PI/2, (handAngle[1]-gyro_offset[1])/ 180 * Math.PI, -(handAngle[2]-gyro_offset[2])/ 180 * Math.PI);
     		}
 		}		
 		

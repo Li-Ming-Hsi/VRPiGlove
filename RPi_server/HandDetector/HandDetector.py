@@ -208,13 +208,17 @@ e_i = 1
 d_i = 2
 
 firstTrans = True
+#halfTime = True
 
 # capture frames from the camera
 while not camera.isStop():
     # grab the raw NumPy array representing the image, then initialize the timestamp
     # and occupied/unoccupied text
     image = camera.read()
-    #ToFDistance = i2c.get_distance(device_handler)
+    #if halfTime:
+#	ToFDistance = i2c.get_distance(device_handler)
+#	halfTime = False
+#    else: halfTime = True
     #print ToFDistance
     #cv2.imshow(windowName, image)
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
