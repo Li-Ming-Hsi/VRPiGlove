@@ -16,54 +16,61 @@ var hand_angle = [0, 0, 0]
 
 var position = [0, 0, 0]
 
-var fingerAngle = [0, 0, 0, 0, 0];
+var finger_angle = [0, 0, 0, 0, 0];
 
 board.on("ready", function() {
-	var gyro = new five.Gyro({
-		controller: "MPU6050"	
-	});
+	//var gyro = new five.Gyro({
+	//	controller: "MPU6050",
+	//	sensitivity: 131	
+	//});
 	
 	var flex1 = new five.Sensor({pin:"A0", freq:30});
 	var flex2 = new five.Sensor({pin:"A1", freq:30});
 	var flex3 = new five.Sensor({pin:"A2", freq:30});
 	var flex4 = new five.Sensor({pin:"A3", freq:30});
-	var flex5 = new five.Sensor({pin:"A4", freq:30});
+	//var flex5 = new five.Sensor({pin:"A4", freq:30});
+
+	var gyro = new five.Gyro({
+		controller: "MPU6050"
+	});
 
    flex1.on("data", function(value) {
 		//console.log(value);
-      //finger_angle = valueMap(400, 700, 0, 180, value);
+      finger_angle[0] = valueMap(-740, -660, 0, 90, -value);
       //console.log(finger_angle)
    });
    
    flex2.on("data", function(value) {
 		//console.log(value);
-      //finger_angle = valueMap(400, 700, 0, 180, value);
+      finger_angle[1] = valueMap(-740, -600, 0, 180, -value);
       //console.log(finger_angle)
    });
    
 	flex3.on("data", function(value) {
 		//console.log(value);
-      //finger_angle = valueMap(400, 700, 0, 180, value);
+      finger_angle[2] = valueMap(-740, -570, 0, 180, -value);
       //console.log(finger_angle)
    });
    
 	flex4.on("data", function(value) {
 		//console.log(value);
-      //finger_angle = valueMap(400, 700, 0, 180, value);
+      finger_angle[3] = valueMap(-600, -350, 0, 180, -value);
+	finger_angle[4] = finger_angle[3];
       //console.log(finger_angle)
    });
    
-	flex5.on("data", function(value) {
+	//flex5.on("data", function(value) {
 		//console.log(value);
-      //finger_angle = valueMap(400, 700, 0, 180, value);
+      //finger_angle[4] = valueMap(-600, -350, 0, 180, -value);
       //console.log(finger_angle)
-   });
+   //});
 	
 	gyro.on("change", function() {
-		hand_angle = [this.pitch, this.roll, this.yaw];
-		//console.log("pitch: ", hand_angle[0]);
-		//console.log("roll: ", hand_angle[1]);
-		//console.log("yaw ", hand_angle[2]);
+		hand_angle = [this.pitch.angle, this.roll.angle, this.yaw.angle];
+		//console.log(hand_angle)
+		console.log("pitch: ", this.pitch);
+		//console.log("roll: ", this.roll);
+		//console.log("yaw ", this.yaw);
 	});
 });
 
@@ -113,7 +120,7 @@ bleno.on('advertisingStart', function(error) {
   								var data_a = new ArrayBuffer(maxValueSize);
   								var data_t = new Uint8Array(data_a);
   								for (let i=0; i<5; i++) {
-									data_t[i] = fingerAngle[i];  								
+									data_t[i] = finger_angle[i];  								
   								}
   								data_t = new Int16Array(data_t.buffer);
   								for (let i=0; i<3; i++) {

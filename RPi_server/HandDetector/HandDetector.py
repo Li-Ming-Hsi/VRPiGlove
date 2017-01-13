@@ -1,4 +1,6 @@
 # import the necessary packages
+import sys
+print (sys.version)
 from PiVideoStream import *
 import time
 import cv2
@@ -7,6 +9,7 @@ import math
 import random
 import binascii
 import struct
+import vl6180 as i2c
 
 # initialize the camera and grab a reference to the raw camera capture
 FRAME_HEIGHT = 320
@@ -191,16 +194,17 @@ print "Listen..."
 conn, addr = server.accept()
 
 print "Accept client!"
-print "Initial camera..."
+print "Initial camera and ToF..."
 #createTrackbars()
 camera.start()
+#device_handler = i2c.init(1)
 time.sleep(2)
 
 print "Start detection!"
 
 erode_size = 3
-dilate_size = 9
-e_i = 2
+dilate_size = 8
+e_i = 1
 d_i = 2
 
 firstTrans = True
@@ -210,24 +214,26 @@ while not camera.isStop():
     # grab the raw NumPy array representing the image, then initialize the timestamp
     # and occupied/unoccupied text
     image = camera.read()
+    #ToFDistance = i2c.get_distance(device_handler)
+    #print ToFDistance
     #cv2.imshow(windowName, image)
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-
-    #H_MAX = cv2.getTrackbarPos("H_MAX", trackbarWindowName)
-    #H_MIN = cv2.getTrackbarPos("H_MIN", trackbarWindowName)
-    #S_MAX = cv2.getTrackbarPos("S_MAX", trackbarWindowName)
-    #S_MIN = cv2.getTrackbarPos("S_MIN", trackbarWindowName)
-    #V_MAX = cv2.getTrackbarPos("V_MAX", trackbarWindowName)
-    #V_MIN = cv2.getTrackbarPos("V_MIN", trackbarWindowName)
-    #erode_size = cv2.getTrackbarPos("E_SIZE", trackbarWindowName)
-    #dilate_size = cv2.getTrackbarPos("D_SIZE", trackbarWindowName)
-    #e_i = cv2.getTrackbarPos("E_ITER", trackbarWindowName)
-    #d_i = cv2.getTrackbarPos("D_ITER", trackbarWindowName)
-
+    """
+    H_MAX = cv2.getTrackbarPos("H_MAX", trackbarWindowName)
+    H_MIN = cv2.getTrackbarPos("H_MIN", trackbarWindowName)
+    S_MAX = cv2.getTrackbarPos("S_MAX", trackbarWindowName)
+    S_MIN = cv2.getTrackbarPos("S_MIN", trackbarWindowName)
+    V_MAX = cv2.getTrackbarPos("V_MAX", trackbarWindowName)
+    V_MIN = cv2.getTrackbarPos("V_MIN", trackbarWindowName)
+    erode_size = cv2.getTrackbarPos("E_SIZE", trackbarWindowName)
+    dilate_size = cv2.getTrackbarPos("D_SIZE", trackbarWindowName)
+    e_i = cv2.getTrackbarPos("E_ITER", trackbarWindowName)
+    d_i = cv2.getTrackbarPos("D_ITER", trackbarWindowName)
+    """
 
     #threshold = cv2.inRange(hsv, (H_MIN, S_MIN, V_MIN), (H_MAX, S_MAX, V_MAX))
-    threshold = cv2.inRange(hsv, (52, 71, 40), (90, 255, 255))
+    threshold = cv2.inRange(hsv, (23, 124, 45), (45, 232, 169))
     threshold = morphOps(threshold)
     #cv2.imshow(windowName3, threshold)
     temp = trackFilteredObject(threshold, image)
@@ -237,11 +243,12 @@ while not camera.isStop():
         #image = drawObject(temp)
         #print "sdfsdfsdfsdfsddfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdfsdf"
 	print "objectFound: {0}".format((x, y))
+	
         if firstTrans:
             bax = struct.pack("f", x)
             bay = struct.pack("f", y)
             binary_string = "%s%s" % (bax, bay)
-            print "sending: {0}".format(binary_string)
+            #print "sending: {0}".format(binary_string)
             conn.send(binary_string)
             firstTrans = False
         else:
@@ -250,11 +257,13 @@ while not camera.isStop():
                 bax = struct.pack("f", x)
                 bay = struct.pack("f", y)
                 binary_string = "%s%s" % (bax, bay)
-                print "sending: {0}".format(binary_string)
+                #print "sending: {0}".format(binary_string)
                 conn.send(binary_string)
+                
     else:
         #image = temp
 	print "None detected"
+	
         if firstTrans:
             conn.send("None detected")
             firstTrans = False

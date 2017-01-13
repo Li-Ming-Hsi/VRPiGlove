@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset = utf-8>
+		<title>Creating a Scene (Cardboard)</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body 
+			{
+				margin: 0px;
+				overflow: hidden;
+			}
+			canvas {width: 100%; height: 100%}
+			#webglviewer {
+				bottom: 0;
+				left: 0;
+				position: absolute;
+				right: 0;
+				top: 0;
+			}
+		</style>
+	</head>
+	<body>
+	<div id="webglviewer"></div>
+		<script src="./js/three.min.js"></script>
+		<script src="./js/StereoEffect.js"></script>
+		<script src="./js/DeviceOrientationControls.js"></script>
+		<script src="./js/OrbitControls.js"></script>
+		<script src='./js/geometries/TeapotBufferGeometry.js'></script>
+		<script src="./js/Detector.js"></script>
+      <script src="./js/stats.min.js"></script>
+		<script src="./js/ammo.js"></script>
+		<script src="ble.js"></script>
+		<script src="hand.js"></script>
+		<script>
+		// Javascript with three.js
+		var scene, camera, renderer, element, container, effect, controls, clock, heightData, teapotVertices;
+		var floor;
+		var teapot;
+		var physicsWorld;
+		var dynamicObjects = [];
+		var transformAux1 = new Ammo.btTransform();
+		var gyro_cali = false;
+		var gyro_offset = [0, 0, 0]
+		
+		function three_init() {			
+			init();
+			inithand();
+			scene.add(big_hand);
+			//initPhysics();
+			/*** Animate ***/
+			clock = new THREE.Clock();
+			animate();
+		}
+		
+		function init()
+		{
+			/*** Scene ***/
+			scene = new THREE.Scene();
+			
+			/*** Camera ***/
+			camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.001, 700);
+			camera.position.set(0, 10, -10);
+
+			scene.add(camera);
+			
+			/*** Renderer ***/
+			renderer = new THREE.WebGLRenderer();
+			element = renderer.domElement;
+			container = document.getElementById('webglviewer');
+			container.appendChild(element);
+			
+			/*** VR Renderer ***/
+			effect = new THREE.StereoEffect(renderer); // VR stereoscopic view (from StereoEffect.js)
+			
+			/*** Controller ***/
+			controls = new THREE.OrbitControls(camera, element);
+			controls.target.set(
+				camera.position.x,
+				camera.position.y,
+				camera.position.z+0.1
+			);
+			controls.noPan = true;
+			controls.noZoom = true;
+			
+			window.addEventListener('deviceorientation', setOrientationControls, true);
+			
+			// Our preferred controls via DeviceOrientation
+			function setOrientationControls(e)
+			{
+				// The DeviceOrientation event listener returns three values 
+				// when it has found a compatible device – alpha, beta and gamma
+				if (!e.alpha) {return;}
+			
+				/*** Controller for Smartphone ***/
+				controls = new THREE.DeviceOrientationControls(camera, true);
+				controls.connect();
+				controls.update();
+				
+				element.addEventListener('click', fullscreen, false);
+				window.removeEventListener('deviceorientation', setOrientationControls, true);
+			}
+			
+			/*** Lights ***/
+			//var light1 = new THREE.PointLight(0x999999, 1, 120);
+			//light1.position.set(0, 0, 80);
+			//scene.add(light1);
+
+			//var light2 = new THREE.PointLight(0x999999, 1, 120);
+			//light2.position.set(0, 80, 0);
+			//scene.add(light2);
+			
+			/*** Creating things ***/
+			// Define some materials
+			var materialColor = new THREE.Color();
+			materialColor.setRGB( 2.0, 1.5, 0.5 );
+			var wireMaterial = new THREE.MeshBasicMaterial({color: 0xFFFFFF, wireframe: true});
+			var flatMaterial = new THREE.MeshBasicMaterial({color: materialColor, specular: 0x0, shading: THREE.FlatShading, side: THREE.DoubleSide});
+			var gouraudMaterial = new THREE.MeshBasicMaterial({color: materialColor, side: THREE.DoubleSide});
+			var phongMaterial = new THREE.MeshBasicMaterial({color: materialColor, shading: THREE.SmoothShading, side: THREE.DoubleSide});
+			var floorMaterial = new THREE.MeshBasicMaterial({color: 0x156289, specular: 0xffffff, emissive: 0x072534, shininess: 10, shading: THREE.FlatShading});
+			
+			// Creating a floor
+			var geometry = new THREE.PlaneBufferGeometry(100, 100, 99, 99);
+			geometry.rotateX(-Math.PI/2);
+			// Generates the height data
+            heightData = new Float32Array(100*100);
+			var p = 0;
+            for ( var j = 0; j < 100; j ++ ) {
+               	for ( var i = 0; i < 100; i ++ ) {
+					if (i>40 && i<60 && j>40 && j<60) { heightData[p] = 2; }
+                	else { heightData[p] = 0; }
+					p++;
+				}
+			}
+			var vertices = geometry.attributes.position.array;
+			for ( var i = 0, j = 0, l = vertices.length; i < l; i ++, j += 3 ) {
+				// j + 1 because it is the y component that we modify
+                vertices[j+1] = heightData[i];
+			}
+			geometry.computeVertexNormals();
+			floor = new THREE.Mesh(geometry, floorMaterial);
+			floor.position.set(0, 0, 0);
+			scene.add(floor);
+			
+			geometry = new THREE.BoxGeometry(2, 2, 2);
+			var handMaterial = new THREE.MeshBasicMaterial({ color:0x00ff00 });				
+			hand = new THREE.Mesh(geometry, handMaterial);
+			hand.position.set(0, 10, -5)
+			scene.add(hand);
+						
+			
+			// Creating a teapot
+			// THREE.TeapotBufferGeometry = function ( size, segments, bottom, lid, body, fitLid, blinn )
+			var teapotGeometry = new THREE.TeapotBufferGeometry(1.5, 0, true, true, true, true, true);
+			teapot = new THREE.Mesh(teapotGeometry, phongMaterial);
+			teapotGeometry.rotateY(-Math.PI/2);
+			teapot.position.set(0, 20, 0);
+			scene.add(teapot);
+			teapotVertices = teapotGeometry.attributes.position.array;  // used for creating shape
+			
+			// Creating something else...
+			
+		}
+		
+		function update_hand() {
+			console.log(handPosition)
+			var raycaster = new THREE.Raycaster();
+			var hand2D = new THREE.Vector2();
+			hand2D.x = handPosition[0] / 160;
+			hand2D.y = -handPosition[1] / 120;
+			raycaster.setFromCamera(hand2D, camera);
+			var hand3D = new THREE.Vector3();
+			raycaster.ray.at(5, hand3D);			
+			//console.log(hand3D);
+			big_hand.position.set(hand3D.x, hand3D.y, hand3D.z)
+			
+			finger_1.rotation.x = fingerAngle[0] / 180 * Math.PI/2;
+			var dist_angle = (fingerAngle[1]) / 180 * Math.PI / 2;
+    		ffinger_2_2.rotation.x = dist_angle;
+    		finger_2.rotation.x = dist_angle;
+    		dist_angle = (fingerAngle[2]) / 180 * Math.PI / 2;
+    		ffinger_3_2.rotation.x = dist_angle;
+    		finger_3.rotation.x = dist_angle;
+			dist_angle = (fingerAngle[3]) / 180 * Math.PI / 2;
+    		ffinger_4_2.rotation.x = dist_angle;
+    		finger_4.rotation.x = dist_angle;
+    		dist_angle = (fingerAngle[4]) / 180 * Math.PI / 2;
+    		ffinger_5_2.rotation.x = dist_angle;
+    		finger_5.rotation.x = dist_angle;
+    		//console.log(handAngle);
+    		if (!gyro_cali) {
+				for(let i=0; i<3; i++) gyro_offset[i] = handAngle[i];
+				hand.rotation.set(Math.PI/2, 0, 0);
+				gyro_cali = true;   		
+    		}
+    		else {
+    			hand.rotation.set((handAngle[0] - gyro_offset[0])/ 180 * Math.PI + Math.PI/2, (handAngle[1]-gyro_offset[1])/ 180 * Math.PI, (handAngle[2]-gyro_offset[2])/ 180 * Math.PI);
+    		}
+		}		
+		
+		function initPhysics()
+		{
+			// Physics configuration
+			var collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+			var dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration );
+			var broadphase = new Ammo.btDbvtBroadphase();
+			var solver = new Ammo.btSequentialImpulseConstraintSolver();
+			physicsWorld = new Ammo.btDiscreteDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration );
+			physicsWorld.setGravity( new Ammo.btVector3(0, -15, 0) );
+			
+			// Create the floor(terrain) body
+			var groundShape = this.createTerrainShape( heightData );
+			var groundTransform = new Ammo.btTransform();
+	  		groundTransform.setIdentity();
+			groundTransform.setOrigin(new Ammo.btVector3( 0, 1, 0 ));
+			var groundMass = 0;
+			var groundLocalInertia = new Ammo.btVector3( 0, 0, 0 );
+  			var groundMotionState = new Ammo.btDefaultMotionState( groundTransform );
+	    	var groundBody = new Ammo.btRigidBody( new Ammo.btRigidBodyConstructionInfo( groundMass, groundMotionState, groundShape, groundLocalInertia ) );
+			physicsWorld.addRigidBody( groundBody );
+			
+			// Create the teapot body
+			var teapotShape = this.createTeapotShape();
+			var teapotMass = 20;
+			var teapotLocalInertia = new Ammo.btVector3(0, 0, 0);
+		    teapotShape.calculateLocalInertia(teapotMass, teapotLocalInertia);
+			var teapotTransform = new Ammo.btTransform();
+    		teapotTransform.setIdentity();
+    		var pos = teapot.position;
+    		teapotTransform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+			var teapotMotionState = new Ammo.btDefaultMotionState(teapotTransform);
+		    var rbInfo = new Ammo.btRigidBodyConstructionInfo(teapotMass, teapotMotionState, teapotShape, teapotLocalInertia);
+		    var teapotBody = new Ammo.btRigidBody(rbInfo);
+			teapot.userData.physicsBody = teapotBody;
+			dynamicObjects.push(teapot);
+			physicsWorld.addRigidBody(teapotBody);
+		}
+		
+		// Create Terrain Shape
+		function createTerrainShape()
+		{
+			// This parameter is not really used, since we are using PHY_FLOAT height data type and hence it is ignored
+			var heightScale = 1;
+
+			// Up axis = 0 for X, 1 for Y, 2 for Z. Normally 1 = Y is used.
+			var upAxis = 1;
+
+			// hdt, height data type. "PHY_FLOAT" is used. Possible values are "PHY_FLOAT", "PHY_UCHAR", "PHY_SHORT"
+			var hdt = "PHY_FLOAT";
+
+			// Set this to your needs (inverts the triangles)
+			var flipQuadEdges = false;
+
+			// Creates height data buffer in Ammo heap
+			ammoHeightData = Ammo._malloc( 4 * 100 * 100 );
+
+			// Copy the javascript height data array to the Ammo one.
+			var p = 0;
+			var p2 = 0;
+			for ( var j = 0; j < 100; j ++ ) {
+				for ( var i = 0; i < 100; i ++ ) {
+					// write 32-bit(2 digits => >> 2) float data to memory
+					Ammo.HEAPF32[ammoHeightData + p2 >> 2] = heightData[p];
+					p ++;
+					// 4 bytes/float
+					p2 += 4;
+				}
+			}
+			
+			// Creates the heightfield physics shape
+			var heightFieldShape = new Ammo.btHeightfieldTerrainShape(
+				100,
+				100,
+				ammoHeightData,
+				heightScale,
+				0,
+				2,
+				upAxis,
+				hdt,
+				flipQuadEdges
+			);
+
+			heightFieldShape.setMargin( 0.05 );
+			return heightFieldShape;
+        }
+		
+		// Create Teapot Shape
+		function createTeapotShape()
+		{
+			var teapotShape = new Ammo.btConvexHullShape();
+			// use addPoint function to create teapot shape
+			for ( var i = 0, j = 0, l = teapotVertices.length; i < l; i ++, j += 3 ) {
+				// j += 3 because x, y, z 3 axes
+				var point_x = teapotVertices[j];
+				var point_y = teapotVertices[j+1];
+				var point_z = teapotVertices[j+2];
+				var point = new Ammo.btVector3(point_x, point_y, point_z);
+                teapotShape.addPoint(point, true);
+			}
+			return teapotShape;
+		}
+		
+		function animate()
+		{
+			// Some animation
+			requestAnimationFrame(animate);	// run again next animation frame
+			update(clock.getDelta());	// resize
+			render(clock.getDelta());
+		}
+		
+		function resize()
+		{
+			var width = container.offsetWidth;
+			var height = container.offsetHeight;
+			camera.aspect = width / height;
+			camera.updateProjectionMatrix();
+			renderer.setSize(width, height);
+			effect.setSize(width, height);
+		}
+		
+		function update(dt)
+		{
+			//updatePhysics(dt);
+			update_hand();
+			resize();
+			camera.updateProjectionMatrix();
+			controls.update(dt);
+		}
+		
+		function updatePhysics(dt)
+		{
+			physicsWorld.stepSimulation(dt, 10);
+
+			// Update objects
+			for ( var i = 0, il = dynamicObjects.length; i < il; i++ )
+			{
+				var objThree = dynamicObjects[ i ];
+			    var objPhys = objThree.userData.physicsBody;
+				var ms = objPhys.getMotionState();
+				if ( ms )
+				{
+					ms.getWorldTransform( transformAux1 );
+					var p = transformAux1.getOrigin();
+					var q = transformAux1.getRotation();
+					objThree.position.set( p.x(), p.y(), p.z() );
+					objThree.quaternion.set( q.x(), q.y(), q.z(), q.w() );
+				}
+			}
+		}
+		
+		function render(dt)
+		{
+			effect.render(scene, camera);
+		}
+		
+		function fullscreen()
+		{
+			if (container.requestFullscreen) {container.requestFullscreen();}
+			else if (container.msRequestFullscreen) {container.msRequestFullscreen();}
+			else if (container.mozRequestFullScreen) {container.mozRequestFullScreen();}
+			else if (container.webkitRequestFullscreen) {container.webkitRequestFullscreen();}
+		}
+		</script>
+	</body>
+</html>
